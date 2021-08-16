@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Container from '@material-ui/core/Container';
-import 'react-big-calendar/lib/css/react-big-calendar.css'
-import { Calendar, View, DateLocalizer } from 'react-big-calendar'
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { Calendar, View, DateLocalizer } from 'react-big-calendar';
 import { momentLocalizer } from 'react-big-calendar';
-import moment from 'moment'
+import moment from 'moment';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import Dialog from '@material-ui/core/Dialog';
@@ -18,9 +18,11 @@ import FormControl from '@material-ui/core/FormControl';
 import Select from '@material-ui/core/Select';
 import Box from '@material-ui/core/Box';
 import 'moment/locale/fr';
+import Snackbar from '@material-ui/core/Snackbar';
+import MuiAlert, { AlertProps } from '@material-ui/lab/Alert';
+import { Color } from '@material-ui/lab/Alert/Alert';
 
 const localizer = momentLocalizer(moment);
-
 const allViews: View[] = ['week'];
 
 interface Props {
@@ -41,61 +43,210 @@ class CalendarEvent {
 }
 
 const App: React.FC = () => {
-
   const [events, setEvents] = useState([] as CalendarEvent[]);
   const [step, setStep] = useState(30);
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const [client, setClient] = useState('');
+  const [openAlert, setOpenAlert] = useState(false);
+  const [severity, setSeverity] = useState('success');
+  const [newEvent, setNewEvent] = useState({} as CalendarEvent);
 
-  const messagesAltertBox = {
-    previousDate: "Impossible de positionner un créneau à cette heure car la date choisie est antérieure à la date actuelle !",
-    lunchTime: "Impossible de positionner un créneau à cette heure pendant la pause midi !",
-    concurentMeeting: "Impossible de positionner un créneau à cette heure car il y a deja un créneau de programmer à ette heure !"
+  interface messagesObject {
+    previousDate: string;
+    lunchTime: string;
+    concurentMeeting: string;
+    clientMissing: string;
+    success: string;
+    [key: string]: string;
   }
 
-  const handleClickOpen = () => {
-    setOpen(true);
+  const messagesAlertBox: messagesObject = {
+    previousDate:
+      'Impossible de positionner un créneau à cette heure car la date choisie est antérieure à la date actuelle !',
+    lunchTime:
+      'Impossible de positionner un créneau à cette heure pendant la pause midi !',
+    concurentMeeting:
+      'Impossible de positionner un créneau à cette heure car il y a deja un créneau de programmer à cette heure !',
+    clientMissing:
+      "Impossible de positionner un créneau si le nom du client n'est pas renseigné",
+    success: 'Rendez-vous correctement posé !',
   };
 
-  const handleClose = () => {
+  const [message, setMessage] = useState(messagesAlertBox['success']);
+  const handleCloseModalCancel = () => {
     setOpen(false);
+    setClient('');
+  };
+
+  const updateTitleNewEvent = () => {
+    setNewEvent((prevState) => ({ ...prevState, title: client }));
+  };
+
+  const handleCloseModalValidate = () => {
+    if (!client) {
+      setSeverity('error');
+      setMessage('clientMissing');
+      setOpenAlert(true);
+      return;
+    }
+
+    let deepCloneNewEvent = {} as CalendarEvent;
+    deepCloneNewEvent.start = moment(newEvent.start).toDate();
+    deepCloneNewEvent.end = moment(newEvent.end).toDate();
+    deepCloneNewEvent.title = client;
+    setNewEvent(deepCloneNewEvent);
+    setEvents([...events, deepCloneNewEvent]);
+    setOpen(false);
+    setClient('');
   };
 
   const handleChangeClient = (event: any) => {
     setClient(event.target.value);
-    console.log(client);
+  };
+
+  function Alert(props: AlertProps) {
+    return <MuiAlert elevation={6} variant="filled" {...props} />;
   }
 
+  const handleCloseAlert = (event?: React.SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setOpenAlert(false);
+  };
+
   const today = new Date();
-  const minRangeHour = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 7, 0, 0);
-  const maxRangeHour = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 21, 0, 0);
+  const minRangeHour = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    7,
+    0,
+    0
+  );
+  const maxRangeHour = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    21,
+    0,
+    0
+  );
 
   const handleChangeStep = (event: any) => {
     setStep(Number(event.target.value));
   };
 
   const handleSelect = ({ start, end }: { start: any; end: any }) => {
-    //handleClickOpen
-
-    setOpen(true);
-
-    if (client) {
-      let newEvent = {} as CalendarEvent;
-      newEvent.start = moment(start).toDate();
-      newEvent.end = moment(end).toDate();
-      newEvent.title = client;
-      setEvents([
-        ...events,
-        newEvent
-      ])
+    if (!checkEventHours({ start, end })) {
+      setSeverity('error');
+      setMessage('concurentMeeting');
+      setOpenAlert(true);
+      return;
     }
+
+    if (!checkLunchHours({ start, end })) {
+      setSeverity('error');
+      setMessage('lunchTime');
+      setOpenAlert(true);
+      return;
+    }
+
+    if (!checkPreviousHours({ start, end })) {
+      setSeverity('error');
+      setMessage('previousDate');
+      setOpenAlert(true);
+      return;
+    }
+
+    let newEvent = {} as CalendarEvent;
+    newEvent.start = moment(start).toDate();
+    newEvent.end = moment(end).toDate();
+
+    setNewEvent(newEvent);
+    setOpen(true);
+  };
+
+  const checkEventHours = ({ start, end }: { start: any; end: any }) => {
+    for (const meeting of events) {
+      if (dateRangeOverlaps(meeting.start, meeting.end, start, end)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const checkLunchHours = ({ start, end }: { start: any; end: any }) => {
+    if (
+      dateRangeOverlapsWide(
+        new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+          13,
+          0,
+          0
+        ),
+        new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+          14,
+          0,
+          0
+        ),
+        start,
+        end
+      )
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const checkPreviousHours = ({ start, end }: { start: any; end: any }) => {
+    if (dateRangeOverlaps(new Date(), new Date(), start, end)) {
+      return false;
+    }
+    return true;
+  };
+
+  function dateRangeOverlaps(
+    a_start: Date,
+    a_end: Date,
+    b_start: Date,
+    b_end: Date
+  ) {
+    if (a_start < b_start && b_start < a_end) return true;
+    if (a_start < b_end && b_end < a_end) return true;
+    if (b_start < a_start && a_end < b_end) return true;
+    return false;
+  }
+
+  function dateRangeOverlapsWide(
+    a_start: Date,
+    a_end: Date,
+    b_start: Date,
+    b_end: Date
+  ) {
+    if (a_start <= b_start && b_start <= a_end) return true;
+    if (a_start <= b_end && b_end <= a_end) return true;
+    if (b_start <= a_start && a_end <= b_end) return true;
+    return false;
   }
 
   return (
     <div className="App">
       <div>
-        <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title">
-          <DialogTitle id="form-dialog-title">Création d'une réunion</DialogTitle>
+        <Dialog
+          open={open}
+          onClose={handleCloseModalCancel}
+          aria-labelledby="form-dialog-title"
+        >
+          <DialogTitle id="form-dialog-title">
+            Création d'une réunion
+          </DialogTitle>
           <DialogContent>
             <DialogContentText>
               Nom du client avec qui la réunion aura lieu :
@@ -110,11 +261,11 @@ const App: React.FC = () => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} color="primary">
+            <Button onClick={handleCloseModalCancel} color="primary">
               Cancel
             </Button>
-            <Button onClick={handleClose} color="primary">
-              Subscribe
+            <Button onClick={handleCloseModalValidate} color="primary">
+              Valider
             </Button>
           </DialogActions>
         </Dialog>
@@ -135,7 +286,7 @@ const App: React.FC = () => {
           max={maxRangeHour}
         />
         <Box m={2} />
-        <FormControl >
+        <FormControl>
           <Select
             labelId="simple-select-placeholder-label"
             id="simple-select"
@@ -150,8 +301,17 @@ const App: React.FC = () => {
           <FormHelperText>Durée minimum d'une réunion</FormHelperText>
         </FormControl>
       </Container>
+      <Snackbar
+        open={openAlert}
+        autoHideDuration={6000}
+        onClose={handleCloseAlert}
+      >
+        <Alert onClose={handleCloseAlert} severity={severity as Color}>
+          {messagesAlertBox[message]}
+        </Alert>
+      </Snackbar>
     </div>
   );
-}
+};
 
 export default App;
