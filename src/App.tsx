@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import Container from '@material-ui/core/Container';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { Calendar, View, DateLocalizer } from 'react-big-calendar';
+import { Calendar, View } from 'react-big-calendar';
 import { momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import Button from '@material-ui/core/Button';
@@ -24,10 +24,6 @@ import { Color } from '@material-ui/lab/Alert/Alert';
 
 const localizer = momentLocalizer(moment);
 const allViews: View[] = ['week'];
-
-interface Props {
-  localizer: DateLocalizer;
-}
 
 class CalendarEvent {
   title: string;
@@ -78,10 +74,6 @@ const App: React.FC = () => {
     setClient('');
   };
 
-  const updateTitleNewEvent = () => {
-    setNewEvent((prevState) => ({ ...prevState, title: client }));
-  };
-
   const handleCloseModalValidate = () => {
     if (!client) {
       setSeverity('error');
@@ -94,6 +86,7 @@ const App: React.FC = () => {
     deepCloneNewEvent.start = moment(newEvent.start).toDate();
     deepCloneNewEvent.end = moment(newEvent.end).toDate();
     deepCloneNewEvent.title = client;
+    // Rajouter fetch api
     setNewEvent(deepCloneNewEvent);
     setEvents([...events, deepCloneNewEvent]);
     setOpen(false);
@@ -168,7 +161,7 @@ const App: React.FC = () => {
     setOpen(true);
   };
 
-  const checkEventHours = ({ start, end }: { start: any; end: any }) => {
+  const checkEventHours = ({ start, end }: { start: Date; end: Date }) => {
     for (const meeting of events) {
       if (dateRangeOverlaps(meeting.start, meeting.end, start, end)) {
         return false;
@@ -177,7 +170,7 @@ const App: React.FC = () => {
     return true;
   };
 
-  const checkLunchHours = ({ start, end }: { start: any; end: any }) => {
+  const checkLunchHours = ({ start, end }: { start: Date; end: Date }) => {
     if (
       dateRangeOverlapsWide(
         new Date(
@@ -205,10 +198,12 @@ const App: React.FC = () => {
     return true;
   };
 
-  const checkPreviousHours = ({ start, end }: { start: any; end: any }) => {
-    if (dateRangeOverlaps(new Date(), new Date(), start, end)) {
+  const checkPreviousHours = ({ start, end }: { start: Date; end: Date }) => {
+    const currentTime = new Date();
+    if (start < currentTime || end < currentTime) {
       return false;
     }
+
     return true;
   };
 
@@ -221,6 +216,7 @@ const App: React.FC = () => {
     if (a_start < b_start && b_start < a_end) return true;
     if (a_start < b_end && b_end < a_end) return true;
     if (b_start < a_start && a_end < b_end) return true;
+    if(b_start.getTime() === a_start.getTime() || a_end.getTime() === b_end.getTime()) return true;
     return false;
   }
 
@@ -245,11 +241,11 @@ const App: React.FC = () => {
           aria-labelledby="form-dialog-title"
         >
           <DialogTitle id="form-dialog-title">
-            Création d'une réunion
+            Création d'une réunion Zoom
           </DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Nom du client avec qui la réunion aura lieu :
+              {`Nom du client avec qui la réunion aura lieu de ${moment(newEvent.start).format('LLLL')} à ${moment(newEvent.end).format('LLLL')} :`}
             </DialogContentText>
             <TextField
               autoFocus
