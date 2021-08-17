@@ -167,7 +167,7 @@ const App: React.FC = () => {
     today.getFullYear(),
     today.getMonth(),
     today.getDate(),
-    7,
+    9,
     0,
     0
   );
@@ -175,7 +175,7 @@ const App: React.FC = () => {
     today.getFullYear(),
     today.getMonth(),
     today.getDate(),
-    21,
+    19,
     0,
     0
   );
