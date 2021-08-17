@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Container from '@material-ui/core/Container';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -21,6 +21,7 @@ import 'moment/locale/fr';
 import Snackbar from '@material-ui/core/Snackbar';
 import MuiAlert, { AlertProps } from '@material-ui/lab/Alert';
 import { Color } from '@material-ui/lab/Alert/Alert';
+import set_meeting from './services/request_zoom';
 
 const localizer = momentLocalizer(moment);
 const allViews: View[] = ['week'];
@@ -66,6 +67,7 @@ const App: React.FC = () => {
     clientMissing:
       "Impossible de positionner un créneau si le nom du client n'est pas renseigné",
     success: 'Rendez-vous correctement posé !',
+    error: "Une erreur s'est produite vérifier si les services fonctionnent !",
   };
 
   const [message, setMessage] = useState(messagesAlertBox['success']);
@@ -73,6 +75,38 @@ const App: React.FC = () => {
     setOpen(false);
     setClient('');
   };
+
+  useEffect(() => {
+    fetch('http://localhost:8081/api/meeting/all')
+      .then((res) => res.json())
+      .then(
+        (result) => {
+          console.log(result);
+          const pick = (O: any, ...K: any) =>
+            K.reduce((o: any, k: any) => ((o[k] = O[k]), o), {});
+          let meetings = result.response.meetings.map((x: any) => {
+            return pick(x, 'start_time', 'topic', 'duration');
+          });
+
+          meetings.forEach((x: any) => {
+            x.title = x.topic;
+            delete x.topic;
+            x.start = new Date(x.start_time);
+            delete x.start_time;
+            x.end = moment(x.start).add(x.duration, 'minutes').toDate();
+            delete x.duration;
+          });
+          setEvents(meetings);
+          console.log(meetings);
+        },
+        (error) => {
+          console.log(error);
+          setSeverity('error');
+          setMessage('error');
+          setOpenAlert(true);
+        }
+      );
+  }, []);
 
   const handleCloseModalValidate = () => {
     if (!client) {
@@ -86,11 +120,30 @@ const App: React.FC = () => {
     deepCloneNewEvent.start = moment(newEvent.start).toDate();
     deepCloneNewEvent.end = moment(newEvent.end).toDate();
     deepCloneNewEvent.title = client;
-    // Rajouter fetch api
-    setNewEvent(deepCloneNewEvent);
-    setEvents([...events, deepCloneNewEvent]);
-    setOpen(false);
-    setClient('');
+    const duration = moment
+      .duration(
+        moment(deepCloneNewEvent.end).diff(moment(deepCloneNewEvent.start))
+      )
+      .asMinutes();
+
+    set_meeting(client, deepCloneNewEvent.start, duration)
+      .then((response: any) => {
+        if (response.status === 200) {
+          setSeverity('success');
+          setMessage('success');
+          setOpenAlert(true);
+          setNewEvent(deepCloneNewEvent);
+          setEvents([...events, deepCloneNewEvent]);
+          setOpen(false);
+          setClient('');
+        }
+      })
+      .catch((error: any) => {
+        console.log(error);
+        setSeverity('error');
+        setMessage('error');
+        setOpenAlert(true);
+      });
   };
 
   const handleChangeClient = (event: any) => {
@@ -216,7 +269,11 @@ const App: React.FC = () => {
     if (a_start < b_start && b_start < a_end) return true;
     if (a_start < b_end && b_end < a_end) return true;
     if (b_start < a_start && a_end < b_end) return true;
-    if(b_start.getTime() === a_start.getTime() || a_end.getTime() === b_end.getTime()) return true;
+    if (
+      b_start.getTime() === a_start.getTime() ||
+      a_end.getTime() === b_end.getTime()
+    )
+      return true;
     return false;
   }
 
@@ -245,7 +302,9 @@ const App: React.FC = () => {
           </DialogTitle>
           <DialogContent>
             <DialogContentText>
-              {`Nom du client avec qui la réunion aura lieu de ${moment(newEvent.start).format('LLLL')} à ${moment(newEvent.end).format('LLLL')} :`}
+              {`Nom du client avec qui la réunion aura lieu de ${moment(
+                newEvent.start
+              ).format('LLLL')} à ${moment(newEvent.end).format('LLLL')} :`}
             </DialogContentText>
             <TextField
               autoFocus
