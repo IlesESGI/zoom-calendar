@@ -41,7 +41,7 @@ class CalendarEvent {
 
 const App: React.FC = () => {
   const [events, setEvents] = useState([] as CalendarEvent[]);
-  const [step, setStep] = useState(30);
+  const [step, setStep] = useState(15);
   const [open, setOpen] = useState(false);
   const [client, setClient] = useState('');
   const [openAlert, setOpenAlert] = useState(false);
