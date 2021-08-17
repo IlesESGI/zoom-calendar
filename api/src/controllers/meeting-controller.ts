@@ -3,6 +3,7 @@ import axios from "axios";
 import { getToken } from "../utils/getToken";
 import RequestError from "../utils/request-error";
 
+// Create a meeting
 export const createMeeting = async (req: Request, res: Response, next: NextFunction) => {
     const token = getToken();
     const { topic } = req.body;
@@ -38,7 +39,7 @@ export const createMeeting = async (req: Request, res: Response, next: NextFunct
 };
 
 
-// gets all meetings of an user
+// Get all meetings of an user
 export const getAllMeetings = async (req: Request, res: Response, next: NextFunction) => {
     const token = getToken();
     await axios.get(`https://api.zoom.us/v2/users/${process.env.API_EMAIL}/meetings`, {

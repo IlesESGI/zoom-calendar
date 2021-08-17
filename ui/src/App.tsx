@@ -26,6 +26,7 @@ import set_meeting from './services/request_zoom';
 const localizer = momentLocalizer(moment);
 const allViews: View[] = ['week'];
 
+// Calendar Object made of the meeting's title, and end start time
 class CalendarEvent {
   title: string;
   start: Date;
@@ -40,12 +41,19 @@ class CalendarEvent {
 }
 
 const App: React.FC = () => {
+  // List of meetings to show on the calendar
   const [events, setEvents] = useState([] as CalendarEvent[]);
+  // Minimum duration of the meeting (allow to zoom/dezoom the calendar) 
   const [step, setStep] = useState(15);
+  // Handle the modal to set the client's name
   const [open, setOpen] = useState(false);
+  // Client's name
   const [client, setClient] = useState('');
+  // Handle alert to keep user informed
   const [openAlert, setOpenAlert] = useState(false);
+  // Severity of the alert (success or error)
   const [severity, setSeverity] = useState('success');
+  // The new meeting created by the user
   const [newEvent, setNewEvent] = useState({} as CalendarEvent);
 
   interface messagesObject {
@@ -57,6 +65,7 @@ const App: React.FC = () => {
     [key: string]: string;
   }
 
+  // Messages for the alert toast
   const messagesAlertBox: messagesObject = {
     previousDate:
       'Impossible de positionner un créneau à cette heure car la date choisie est antérieure à la date actuelle !',
@@ -76,14 +85,18 @@ const App: React.FC = () => {
     setClient('');
   };
 
+  // Load the meetings
   useEffect(() => {
     fetch('http://localhost:8081/api/meeting/all')
       .then((res) => res.json())
       .then(
         (result) => {
-          console.log(result);
-          const pick = (O: any, ...K: any) =>
-            K.reduce((o: any, k: any) => ((o[k] = O[k]), o), {});
+          function pick(o: any, ...fields:any) {
+            return fields.reduce((a:any, x:any) => {
+              if (o.hasOwnProperty(x)) a[x] = o[x];
+              return a;
+            }, {});
+          }
           let meetings = result.response.meetings.map((x: any) => {
             return pick(x, 'start_time', 'topic', 'duration');
           });
@@ -97,7 +110,6 @@ const App: React.FC = () => {
             delete x.duration;
           });
           setEvents(meetings);
-          console.log(meetings);
         },
         (error) => {
           console.log(error);
@@ -108,6 +120,7 @@ const App: React.FC = () => {
       );
   }, []);
 
+  // When the user validate the new meeting check if the client is given and launch the request to place it on Zoom
   const handleCloseModalValidate = () => {
     if (!client) {
       setSeverity('error');
@@ -162,6 +175,8 @@ const App: React.FC = () => {
     setOpenAlert(false);
   };
 
+
+  // Fix the range hours of the calendar to 9h to 19h
   const today = new Date();
   const minRangeHour = new Date(
     today.getFullYear(),
@@ -192,6 +207,7 @@ const App: React.FC = () => {
       return;
     }
 
+    // Check if the meeting is on lunch time
     if (!checkLunchHours({ start, end })) {
       setSeverity('error');
       setMessage('lunchTime');
@@ -199,6 +215,7 @@ const App: React.FC = () => {
       return;
     }
 
+    // Check if the meeting is positionned in the past
     if (!checkPreviousHours({ start, end })) {
       setSeverity('error');
       setMessage('previousDate');

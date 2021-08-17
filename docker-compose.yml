@@ -6,6 +6,13 @@ services:
       - '3000:3000'
     depends_on:
       - api
+  test:
+    build: ./ui
+    environment:
+      - API_HOST=api
+    depends_on:
+      - api
+    command: npm test
   api:
     build: ./api
     ports:
