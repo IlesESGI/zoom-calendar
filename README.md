@@ -1,7 +1,7 @@
 # zoom-calendar
 
 This little app allow a user to see his Zoom meetings on a calendar but also to create new meeting by drag and drop on the calendar.<br/>
-The meetings can't be set on the lunch time (1PM-2PM), can't overlap and can't be set in the past.
+Meetings can't be set on lunch time (1PM-2PM), can't overlap and can't be set in the past.
 
 ## Technologies
 
