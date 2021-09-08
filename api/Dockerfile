@@ -8,7 +8,7 @@ COPY package*.json /usr/src/api/
 RUN npm install
 # Copy the current directory contents into the container at /api
 COPY . /usr/src/api/
-# Make port 80 available to the world outside this container
+# Make port 8081 available to the world outside this container
 EXPOSE 8081
 # Run the app when the container launches
 CMD ["yarn", "dev"]
